@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import type { Env, RewardSession } from './types'
 import { specifications } from './specifications'
+import { processImage } from './image'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -92,18 +93,26 @@ app.post('/v1/process-photo', async (c) => {
     session.status = 'consumed'
   }
 
-  // TODO: integrate image processing (crop, resize, background replacement)
   const arrayBuffer = await photo.arrayBuffer()
-  const bytes = new Uint8Array(arrayBuffer)
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-  const base64 = btoa(binary)
+  const bgColor = background || spec.backgrounds[0]
   const mimeType = photo.type || 'image/jpeg'
 
+  const resultBytes = processImage(
+    new Uint8Array(arrayBuffer),
+    mimeType,
+    spec.widthPx,
+    spec.heightPx,
+    bgColor,
+  )
+
+  let binary = ''
+  for (let i = 0; i < resultBytes.length; i++) binary += String.fromCharCode(resultBytes[i])
+  const base64 = btoa(binary)
+
   return c.json({
-    image: `data:${mimeType};base64,${base64}`,
+    image: `data:image/jpeg;base64,${base64}`,
     specId,
-    background: background || spec.backgrounds[0],
+    background: bgColor,
     widthPx: spec.widthPx,
     heightPx: spec.heightPx,
   })
