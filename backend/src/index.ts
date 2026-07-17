@@ -92,19 +92,20 @@ app.post('/v1/process-photo', async (c) => {
     session.status = 'consumed'
   }
 
-  // MVP: return the original photo as-is
   // TODO: integrate image processing (crop, resize, background replacement)
   const arrayBuffer = await photo.arrayBuffer()
+  const bytes = new Uint8Array(arrayBuffer)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+  const base64 = btoa(binary)
+  const mimeType = photo.type || 'image/jpeg'
 
-  return new Response(arrayBuffer, {
-    headers: {
-      'Content-Type': photo.type || 'image/jpeg',
-      'X-Spec-Id': specId,
-      'X-Background': background || spec.backgrounds[0],
-      'X-Width-Px': String(spec.widthPx),
-      'X-Height-Px': String(spec.heightPx),
-      'Cache-Control': 'no-store',
-    },
+  return c.json({
+    image: `data:${mimeType};base64,${base64}`,
+    specId,
+    background: background || spec.backgrounds[0],
+    widthPx: spec.widthPx,
+    heightPx: spec.heightPx,
   })
 })
 

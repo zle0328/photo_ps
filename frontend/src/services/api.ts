@@ -1,7 +1,5 @@
-import type { GenerationTask } from '../types/photo'
-
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
-export const apiBaseUrl = (configuredBaseUrl || 'http://127.0.0.1:8787').replace(/\/$/, '')
+export const apiBaseUrl = (configuredBaseUrl || 'https://id-photo-api.2712182807.workers.dev').replace(/\/$/, '')
 
 interface ApiErrorBody {
   detail?: string
@@ -17,6 +15,14 @@ interface RewardSessionResponse {
 interface RewardGrantResponse {
   grantToken: string
   expiresAt: string
+}
+
+export interface ProcessPhotoResult {
+  image: string
+  specId: string
+  background: string
+  widthPx: number
+  heightPx: number
 }
 
 const request = <T>(path: string, method: 'GET' | 'POST', data?: object) =>
@@ -46,16 +52,16 @@ export const createRewardSession = (specId: string) =>
 export const completeRewardSession = (sessionId: string, completion: 'ad_completed' | 'development_bypass') =>
   request<RewardGrantResponse>(`/v1/reward-sessions/${encodeURIComponent(sessionId)}/complete`, 'POST', { completion })
 
-interface CreateTaskInput {
+interface ProcessPhotoInput {
   specId: string
   background: string
   grantToken: string
 }
 
-export const createGenerationTask = (photoPath: string, input: CreateTaskInput) =>
-  new Promise<GenerationTask>((resolve, reject) => {
+export const processPhoto = (photoPath: string, input: ProcessPhotoInput) =>
+  new Promise<ProcessPhotoResult>((resolve, reject) => {
     uni.uploadFile({
-      url: `${apiBaseUrl}/v1/generation-tasks`,
+      url: `${apiBaseUrl}/v1/process-photo`,
       filePath: photoPath,
       name: 'photo',
       timeout: 30_000,
@@ -65,25 +71,22 @@ export const createGenerationTask = (photoPath: string, input: CreateTaskInput) 
         grant_token: input.grantToken,
       },
       success(response) {
-        let body: GenerationTask | ApiErrorBody
+        let body: ProcessPhotoResult | ApiErrorBody
         try {
-          body = JSON.parse(response.data) as GenerationTask | ApiErrorBody
+          body = JSON.parse(response.data) as ProcessPhotoResult | ApiErrorBody
         } catch {
           reject(new Error('服务器返回了无法识别的数据'))
           return
         }
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          resolve(body as GenerationTask)
+          resolve(body as ProcessPhotoResult)
           return
         }
         const errorBody = body as ApiErrorBody
-        reject(new Error(errorBody.detail || errorBody.message || `上传失败（${response.statusCode}）`))
+        reject(new Error(errorBody.detail || errorBody.message || `处理失败（${response.statusCode}）`))
       },
       fail(error) {
         reject(new Error(error.errMsg || '照片上传失败'))
       },
     })
   })
-
-export const getGenerationTask = (taskId: string) =>
-  request<GenerationTask>(`/v1/generation-tasks/${encodeURIComponent(taskId)}`, 'GET')

@@ -49,8 +49,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRewardedAd } from '../../composables/useRewardedAd'
 import { findSpecification } from '../../data/specifications'
-import { completeRewardSession, createGenerationTask, createRewardSession } from '../../services/api'
-import type { GenerationTask, PhotoDraft } from '../../types/photo'
+import { completeRewardSession, createRewardSession, processPhoto } from '../../services/api'
+import type { PhotoDraft, PhotoResult } from '../../types/photo'
 
 const draft = ref<PhotoDraft | null>(null)
 const submitting = ref(false)
@@ -75,9 +75,9 @@ const confirmDevelopmentBypass = () =>
     })
   })
 
-const rememberTask = (task: GenerationTask) => {
-  const existing = (uni.getStorageSync('photo-history') || []) as GenerationTask[]
-  uni.setStorageSync('photo-history', [task, ...existing.filter((item) => item.id !== task.id)].slice(0, 20))
+const saveToHistory = (result: PhotoResult) => {
+  const existing = (uni.getStorageSync('photo-history') || []) as PhotoResult[]
+  uni.setStorageSync('photo-history', [result, ...existing].slice(0, 20))
 }
 
 const startGeneration = async () => {
@@ -103,14 +103,29 @@ const startGeneration = async () => {
 
     actionText.value = '校验生成资格…'
     const grant = await completeRewardSession(rewardSession.id, completion)
+
     actionText.value = '上传并生成…'
-    const task = await createGenerationTask(draft.value.photoPath, {
+    const result = await processPhoto(draft.value.photoPath, {
       specId: draft.value.specId,
       background: draft.value.background,
       grantToken: grant.grantToken,
     })
-    rememberTask(task)
-    uni.navigateTo({ url: `/pages/result/index?id=${encodeURIComponent(task.id)}` })
+
+    actionText.value = '保存结果…'
+    const tempFilePath = `${uni.env.USER_DATA_PATH}/photo_result_${Date.now()}.jpg`
+    const base64Data = result.image.replace(/^data:[^;]+;base64,/, '')
+    const fs = uni.getFileSystemManager()
+    fs.writeFileSync(tempFilePath, base64Data, 'base64')
+
+    const photoResult: PhotoResult = {
+      specId: result.specId,
+      background: result.background,
+      tempFilePath,
+      createdAt: new Date().toISOString(),
+    }
+    saveToHistory(photoResult)
+    uni.setStorageSync('photo-latest-result', photoResult)
+    uni.navigateTo({ url: '/pages/result/index' })
   } catch (error) {
     lastError.value = error instanceof Error ? error.message : '生成失败，请稍后重试'
     uni.showToast({ title: lastError.value, icon: 'none', duration: 2600 })

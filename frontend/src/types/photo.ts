@@ -20,10 +20,9 @@ export interface PhotoDraft {
   updatedAt: string
 }
 
-export interface GenerationTask {
-  id: string
-  status: 'pending' | 'processing' | 'succeeded' | 'failed'
+export interface PhotoResult {
   specId: string
-  resultUrl?: string
-  errorMessage?: string
+  background: string
+  tempFilePath: string
+  createdAt: string
 }
