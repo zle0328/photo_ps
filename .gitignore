@@ -1,0 +1,30 @@
+node_modules/
+dist/
+.output/
+.temp/
+.cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.dev.vars
+
+# uni-app build output
+frontend/dist/
+
+# Wrangler
+backend/.wrangler/
+
+# Logs
+*.log
+npm-debug.log*

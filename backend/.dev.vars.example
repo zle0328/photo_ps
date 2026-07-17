@@ -1,0 +1,4 @@
+# Cloudflare Workers dev secrets
+# Copy to .dev.vars and fill in real values
+CORS_ORIGIN=http://localhost:5173
+ENVIRONMENT=development

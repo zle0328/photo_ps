@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #f1f0ff;
+  --color-brand-100: #e5e3ff;
+  --color-brand-500: #6865ed;
+  --color-brand-600: #5956df;
+  --color-brand-700: #4946c6;
+  --color-canvas: #eef5ff;
+  --color-ink: #172033;
+  --color-muted: #8fa0ba;
+  --color-line: #e4eaf3;
+  --radius-card: 1rem;
+}
+
+@utility safe-bottom {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
+@utility card-shadow {
+  box-shadow: 0 0.5rem 1.5rem rgba(80, 96, 128, 0.1);
+}
