@@ -1,15 +1,11 @@
 <template>
   <view class="min-h-screen bg-canvas px-4 pb-8 pt-4">
-    <view class="rounded-card border border-orange-100 bg-orange-50 px-4 py-3">
-      <text class="text-sm leading-6 text-orange-600">温馨提醒：生产版计划仅保留电子照 7 天；当前本地记录可在“我的”中清理。</text>
-    </view>
-
-    <view v-if="history.length" class="mt-4 flex flex-col gap-3">
-      <view v-for="item in history" :key="item.id" class="flex items-center rounded-card bg-white p-4 card-shadow" @tap="openTask(item.id)">
-        <view class="flex h-14 w-12 items-center justify-center rounded-lg bg-brand-50 text-brand-600">▣</view>
+    <view v-if="history.length" class="flex flex-col gap-3">
+      <view v-for="(item, index) in history" :key="index" class="flex items-center rounded-card bg-white p-4 card-shadow" @tap="openResult(index)">
+        <image :src="item.tempFilePath" mode="aspectFill" class="h-14 w-12 rounded-lg" />
         <view class="ml-4 min-w-0 flex-1">
           <text class="block truncate text-base font-semibold text-ink">{{ findSpecification(item.specId).name }}</text>
-          <text class="mt-1 block text-sm text-muted">{{ statusText[item.status] }}</text>
+          <text class="mt-1 block text-sm text-muted">{{ formatDate(item.createdAt) }}</text>
         </view>
         <text class="text-xl text-muted">›</text>
       </view>
@@ -28,20 +24,23 @@
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { findSpecification } from '../../data/specifications'
-import type { GenerationTask } from '../../types/photo'
+import type { PhotoResult } from '../../types/photo'
 
-const history = ref<GenerationTask[]>([])
-const statusText: Record<GenerationTask['status'], string> = {
-  pending: '等待处理',
-  processing: '制作中',
-  succeeded: '已生成，可查看下载',
-  failed: '生成失败',
-}
+const history = ref<PhotoResult[]>([])
 
 onShow(() => {
-  history.value = (uni.getStorageSync('photo-history') || []) as GenerationTask[]
+  history.value = (uni.getStorageSync('photo-history') || []) as PhotoResult[]
 })
 
-const openTask = (id: string) => uni.navigateTo({ url: `/pages/result/index?id=${encodeURIComponent(id)}` })
+const formatDate = (iso: string) => {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+const openResult = (index: number) => {
+  uni.setStorageSync('photo-latest-result', history.value[index])
+  uni.navigateTo({ url: '/pages/result/index' })
+}
+
 const goCreate = () => uni.switchTab({ url: '/pages/index/index' })
 </script>

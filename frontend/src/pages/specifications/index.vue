@@ -12,19 +12,22 @@
       <text v-if="keyword" class="text-muted" @tap="keyword = ''">×</text>
     </view>
 
-    <scroll-view scroll-x class="mt-4 whitespace-nowrap">
-      <view class="inline-flex gap-2 pb-2">
+    <view class="mt-4 rounded-card bg-white p-4 card-shadow">
+      <view class="flex items-center justify-between">
+        <text class="text-sm text-muted">当前 <text class="font-semibold text-ink">{{ activeCategory }}</text></text>
+      </view>
+      <view class="mt-3 grid grid-cols-4 gap-2">
         <button
           v-for="category in categories"
           :key="category"
-          class="rounded-full px-4 py-2 text-sm"
-          :class="activeCategory === category ? 'bg-brand-500 text-white' : 'bg-white text-ink'"
+          class="rounded-lg border px-2 py-2 text-sm"
+          :class="activeCategory === category ? 'border-brand-500 text-brand-600' : 'border-line text-ink'"
           @tap="activeCategory = category"
         >
           {{ category }}
         </button>
       </view>
-    </scroll-view>
+    </view>
 
     <view v-if="filteredSpecifications.length" class="mt-2 grid grid-cols-2 gap-3">
       <SpecCard
@@ -46,11 +49,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import SpecCard from '../../components/SpecCard.vue'
-import { specifications } from '../../data/specifications'
+import { categories as specCategories, specifications } from '../../data/specifications'
 
 const keyword = ref('')
 const activeCategory = ref('全部')
-const categories = ['全部', '常用', '考试', '资格证', '学籍']
+const categories = ['全部', ...specCategories]
 
 const filteredSpecifications = computed(() => {
   const query = keyword.value.trim().toLowerCase()

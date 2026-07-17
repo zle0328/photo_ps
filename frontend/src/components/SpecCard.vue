@@ -4,7 +4,7 @@
       <view class="min-w-0 flex-1">
         <text class="block truncate text-base font-semibold text-ink">{{ spec.name }}</text>
         <text class="mt-2 block text-sm text-muted">
-          {{ spec.widthMm }}×{{ spec.heightMm }}mm · {{ spec.widthPx }}×{{ spec.heightPx }}px
+          {{ spec.widthMm }}x{{ spec.heightMm }}mm | {{ spec.widthPx }}x{{ spec.heightPx }}px
         </text>
       </view>
       <view class="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-600">
