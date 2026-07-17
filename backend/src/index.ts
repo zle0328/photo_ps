@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import type { Env, GenerationTask, RewardSession } from './types'
+import type { Env, RewardSession } from './types'
 import { specifications } from './specifications'
 
 const app = new Hono<{ Bindings: Env }>()
@@ -12,7 +12,7 @@ app.use('*', async (c, next) => {
 
 // ── Health ──
 
-app.get('/health', (c) => c.json({ status: 'ok' }))
+app.get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }))
 
 // ── Specifications ──
 
@@ -31,27 +31,30 @@ app.get('/v1/specifications/:id', (c) => {
   return c.json(spec)
 })
 
-// ── Reward Sessions (ad unlock) ──
+// ── Reward Sessions ──
 
 const rewardSessions = new Map<string, RewardSession>()
 
 app.post('/v1/reward-sessions', async (c) => {
   const body = await c.req.json<{ specId: string }>()
+  if (!body.specId) return c.json({ detail: '缺少 specId' }, 400)
+
   const id = crypto.randomUUID()
   const session: RewardSession = {
     id,
     specId: body.specId,
     status: 'pending',
-    expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    expiresAt: Date.now() + 10 * 60 * 1000,
   }
   rewardSessions.set(id, session)
-  return c.json(session, 201)
+  return c.json({ id: session.id, status: session.status, expiresAt: new Date(session.expiresAt).toISOString() }, 201)
 })
 
 app.post('/v1/reward-sessions/:id/complete', async (c) => {
   const session = rewardSessions.get(c.req.param('id'))
   if (!session) return c.json({ detail: '奖励会话不存在' }, 404)
   if (session.status !== 'pending') return c.json({ detail: '会话已完成或已使用' }, 409)
+  if (Date.now() > session.expiresAt) return c.json({ detail: '会话已过期' }, 410)
 
   const body = await c.req.json<{ completion: string }>()
   if (body.completion !== 'ad_completed' && body.completion !== 'development_bypass') {
@@ -59,99 +62,50 @@ app.post('/v1/reward-sessions/:id/complete', async (c) => {
   }
 
   session.status = 'completed'
-  const grantToken = crypto.randomUUID()
+  session.grantToken = crypto.randomUUID()
   return c.json({
-    grantToken,
+    grantToken: session.grantToken,
     expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
   })
 })
 
-// ── Generation Tasks ──
+// ── Photo Processing (stateless, returns result directly) ──
 
-const tasks = new Map<string, GenerationTask>()
-
-app.post('/v1/generation-tasks', async (c) => {
+app.post('/v1/process-photo', async (c) => {
   const formData = await c.req.formData()
   const photo = formData.get('photo') as File | null
   const specId = formData.get('spec_id') as string
   const background = formData.get('background') as string
   const grantToken = formData.get('grant_token') as string
 
-  if (!photo || !specId || !background || !grantToken) {
-    return c.json({ detail: '缺少必填参数' }, 400)
-  }
+  if (!photo || !specId) return c.json({ detail: '缺少 photo 或 spec_id' }, 400)
 
   const spec = specifications.find((s) => s.id === specId)
   if (!spec) return c.json({ detail: '规格不存在' }, 404)
 
-  const taskId = crypto.randomUUID()
-  const objectKey = `uploads/${taskId}/${photo.name}`
-  await c.env.PHOTOS.put(objectKey, photo.stream(), {
-    httpMetadata: { contentType: photo.type },
-  })
-
-  const task: GenerationTask = {
-    id: taskId,
-    status: 'pending',
-    specId,
-    createdAt: new Date().toISOString(),
+  // Validate grant token
+  const session = [...rewardSessions.values()].find((s) => s.grantToken === grantToken)
+  if (!session && c.env.ENVIRONMENT !== 'development') {
+    return c.json({ detail: '无效的授权令牌' }, 403)
   }
-  tasks.set(taskId, task)
-
-  processTask(task, objectKey, background, spec, c.env).catch(() => {
-    task.status = 'failed'
-    task.errorMessage = '处理失败'
-  })
-
-  return c.json(task, 201)
-})
-
-app.get('/v1/generation-tasks/:id', (c) => {
-  const task = tasks.get(c.req.param('id'))
-  if (!task) return c.json({ detail: '任务不存在' }, 404)
-  return c.json(task)
-})
-
-// ── Image Processing (placeholder — swap in Workers AI later) ──
-
-async function processTask(
-  task: GenerationTask,
-  objectKey: string,
-  _background: string,
-  _spec: { widthPx: number; heightPx: number },
-  env: Env,
-) {
-  task.status = 'processing'
-  try {
-    const original = await env.PHOTOS.get(objectKey)
-    if (!original) throw new Error('原图丢失')
-
-    // TODO: integrate Workers AI for background removal & resize
-    // For now, store original as result to complete the pipeline
-    const resultKey = objectKey.replace('uploads/', 'results/')
-    await env.PHOTOS.put(resultKey, original.body, {
-      httpMetadata: original.httpMetadata,
-    })
-
-    task.status = 'succeeded'
-    task.resultUrl = `/v1/photos/${resultKey}`
-  } catch (e) {
-    task.status = 'failed'
-    task.errorMessage = e instanceof Error ? e.message : '处理失败'
+  if (session) {
+    session.status = 'consumed'
   }
-}
 
-// ── Photo download ──
+  // MVP: return the original photo as-is
+  // TODO: integrate image processing (crop, resize, background replacement)
+  const arrayBuffer = await photo.arrayBuffer()
 
-app.get('/v1/photos/*', async (c) => {
-  const key = c.req.path.replace('/v1/photos/', '')
-  const object = await c.env.PHOTOS.get(key)
-  if (!object) return c.json({ detail: '文件不存在' }, 404)
-
-  const headers = new Headers()
-  object.writeHttpMetadata(headers)
-  headers.set('Cache-Control', 'public, max-age=3600')
-  return new Response(object.body, { headers })
+  return new Response(arrayBuffer, {
+    headers: {
+      'Content-Type': photo.type || 'image/jpeg',
+      'X-Spec-Id': specId,
+      'X-Background': background || spec.backgrounds[0],
+      'X-Width-Px': String(spec.widthPx),
+      'X-Height-Px': String(spec.heightPx),
+      'Cache-Control': 'no-store',
+    },
+  })
 })
 
 export default app

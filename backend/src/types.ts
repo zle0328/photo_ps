@@ -1,6 +1,4 @@
 export interface Env {
-  PHOTOS: R2Bucket
-  AI: Ai
   CORS_ORIGIN: string
   ENVIRONMENT: string
 }
@@ -20,18 +18,10 @@ export interface PhotoSpecification {
   featured?: boolean
 }
 
-export interface GenerationTask {
-  id: string
-  status: 'pending' | 'processing' | 'succeeded' | 'failed'
-  specId: string
-  resultUrl?: string
-  errorMessage?: string
-  createdAt: string
-}
-
 export interface RewardSession {
   id: string
   specId: string
   status: 'pending' | 'completed' | 'consumed'
-  expiresAt: string
+  grantToken?: string
+  expiresAt: number
 }

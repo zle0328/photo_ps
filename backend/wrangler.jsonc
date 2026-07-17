@@ -3,23 +3,10 @@
   "name": "id-photo-api",
   "main": "src/index.ts",
   "compatibility_date": "2025-07-14",
+  "compatibility_flags": ["nodejs_compat"],
 
-  // R2 bucket for photo uploads and results
-  "r2_buckets": [
-    {
-      "binding": "PHOTOS",
-      "bucket_name": "id-photo-uploads"
-    }
-  ],
-
-  // AI binding for background removal
-  "ai": {
-    "binding": "AI"
-  },
-
-  // Environment variables (override in wrangler deploy or dashboard)
   "vars": {
-    "CORS_ORIGIN": "http://localhost:5173",
+    "CORS_ORIGIN": "*",
     "ENVIRONMENT": "development"
   }
 }
